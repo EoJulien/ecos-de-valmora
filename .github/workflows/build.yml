@@ -62,21 +62,36 @@ jobs:
           unzip -q projeto.zip -d proj
           PROJ=$(dirname "$(find proj -name project.godot | head -n 1)")
           mkdir -p out
+          APK="$GITHUB_WORKSPACE/out/ecos-de-valmora.apk"
+          godot --headless --path "$PROJ" --import || true
+          set +e
+
+          echo "=== TENTATIVA 1: debug com variaveis de ambiente ==="
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/debug.keystore"
           export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
           export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
-          godot --headless --path "$PROJ" --import || true
-          echo "=== DIAGNOSTICO ==="
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/" || true
-          ls "$ANDROID_HOME" "$ANDROID_HOME/build-tools" "$ANDROID_HOME/platforms" "$ANDROID_HOME/cmdline-tools" || true
-          ls -la "$HOME/.config/godot" || true
-          cat "$HOME"/.config/godot/*.tres || true
-          ls -la "$HOME/debug.keystore" || true
-          echo "=== FIM DIAGNOSTICO ==="
-          godot --headless --path "$PROJ" --export-debug "Android" "$GITHUB_WORKSPACE/out/ecos-de-valmora.apk"
+          godot --headless --verbose --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 60
+
+          if [ ! -f "$APK" ]; then
+            echo "=== TENTATIVA 2: debug sem variaveis de ambiente ==="
+            unset GODOT_ANDROID_KEYSTORE_DEBUG_PATH GODOT_ANDROID_KEYSTORE_DEBUG_USER GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD
+            godot --headless --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 15
+          fi
+
+          if [ ! -f "$APK" ]; then
+            echo "=== TENTATIVA 3: debug sem assinatura ==="
+            sed -i 's/^package\/signed=true/package\/signed=false/' "$PROJ/export_presets.cfg"
+            godot --headless --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 15
+          fi
+
+          if [ ! -f "$APK" ]; then
+            echo "=== TENTATIVA 4: release sem assinatura ==="
+            godot --headless --path "$PROJ" --export-release "Android" "$APK" 2>&1 | tail -n 15
+          fi
+
+          echo "=== RESULTADO ==="
           ls -la out
+          test -f "$APK"
 
       - name: Publicar APK em Releases
         uses: softprops/action-gh-release@v2
