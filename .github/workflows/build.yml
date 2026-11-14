@@ -63,30 +63,24 @@ jobs:
           PROJ=$(dirname "$(find proj -name project.godot | head -n 1)")
           mkdir -p out
           APK="$GITHUB_WORKSPACE/out/ecos-de-valmora.apk"
+          # Android exige compressao de textura ETC2/ASTC ligada no projeto
+          if ! grep -q import_etc2_astc "$PROJ/project.godot"; then
+            sed -i '/^\[rendering\]/a textures/vram_compression/import_etc2_astc=true' "$PROJ/project.godot"
+          fi
+          grep -n -A4 "^\[rendering\]" "$PROJ/project.godot"
           godot --headless --path "$PROJ" --import || true
           set +e
 
-          echo "=== TENTATIVA 1: debug com variaveis de ambiente ==="
+          echo "=== TENTATIVA 1: debug ==="
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/debug.keystore"
           export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
           export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
-          godot --headless --verbose --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 60
+          godot --headless --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 20
 
           if [ ! -f "$APK" ]; then
             echo "=== TENTATIVA 2: debug sem variaveis de ambiente ==="
             unset GODOT_ANDROID_KEYSTORE_DEBUG_PATH GODOT_ANDROID_KEYSTORE_DEBUG_USER GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD
-            godot --headless --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 15
-          fi
-
-          if [ ! -f "$APK" ]; then
-            echo "=== TENTATIVA 3: debug sem assinatura ==="
-            sed -i 's/^package\/signed=true/package\/signed=false/' "$PROJ/export_presets.cfg"
-            godot --headless --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 15
-          fi
-
-          if [ ! -f "$APK" ]; then
-            echo "=== TENTATIVA 4: release sem assinatura ==="
-            godot --headless --path "$PROJ" --export-release "Android" "$APK" 2>&1 | tail -n 15
+            godot --headless --path "$PROJ" --export-debug "Android" "$APK" 2>&1 | tail -n 20
           fi
 
           echo "=== RESULTADO ==="
