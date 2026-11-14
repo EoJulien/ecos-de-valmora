@@ -59,7 +59,7 @@ jobs:
 
       - name: Exportar APK
         run: |
-          unzip -q projeto.zip -d proj
+          unzip -q "projeto (1).zip" -d proj
           PROJ=$(dirname "$(find proj -name project.godot | head -n 1)")
           mkdir -p out
           APK="$GITHUB_WORKSPACE/out/ecos-de-valmora.apk"
